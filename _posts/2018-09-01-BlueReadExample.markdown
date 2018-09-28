@@ -3,16 +3,16 @@ layout: post
 title:  "ViDi API / Blue Read Example"
 date:   2018-09-01 23:19:00
 author: Alex Choi
-categories: Deep-Learning ViDi
+categories: Deep-Learning
 ---
 
 Today I'd like to share an ViDi API example of Blue Read tool with my experiencing from SDI battery OCR evaluation project.
 
 The target of the project is to read the characters, which are marked with laser, on the upper part of batteries - there may be more than three batteries in an image, so our mission is to read all the characters on those batteries at once!
 
-<img src="../../../../../assets/posts/2018-09-01-BlueReadExample/01.png" title="Original">
+<img src="{{ site.baseurl }}/assets/posts/2018-09-01-BlueReadExample/01.png" title="Original">
 
-<img src="../../../../../assets/posts/2018-09-01-BlueReadExample/02.png" title="Read">
+<img src="{{ site.baseurl }}/assets/posts/2018-09-01-BlueReadExample/02.png" title="Read">
 
 Firstly, I wanna share my example solution (zipped) file - Click the link below to download it!
 
@@ -224,7 +224,7 @@ In `foreach (IMatch match in view.Matches)` loop, we can get the results for eac
 
 ------
 ## Result
-<img src="../../../../../assets/posts/2018-09-01-BlueReadExample/03.png" title="Result">
+<img src="{{ site.baseurl }}/assets/posts/2018-09-01-BlueReadExample/03.png" title="Result">
 
 The image below is a part of the execution result shown in command line window:
 

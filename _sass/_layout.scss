@@ -32,9 +32,11 @@ code {
 	display: inline-block;
 	border-radius: 3px;
 	padding: 0 3px;
+	font-size: modular-scale(-1);
 }
 
 pre code.hljs {
+	font-family: "Consolas", 'Nanum Gothic', "Menlo", "Monaco", "Courier", monospace;
 	font-size: modular-scale(-1);
 }
 

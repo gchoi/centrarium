@@ -1,0 +1,252 @@
+---
+layout: post
+title:  "RANSAC Algorithm"
+date:   2018-03-25 23:02:00
+author: Alex Choi
+categories: Computer-Vision
+---
+
+이번 포스팅에서는 RANSAC(Random Sample Consensus)에 대하여 다루도록 하겠습니다.
+
+1. RANSAC의 필요성
+2. RANSAC의 이해
+3. Inlier와 Outlier
+4. RANSAC 알고리즘
+5. RANSAC의 활용 예
+6. RANSAC 알고리즘의 파라미터
+7. RANSAC과 robust 파라미터 추정
+8. RANSAC에 대한 생각
+
+------
+## 1. RANSAC의 필요성
+RANSAC의 개념을 설명하기 전에 RANSAC이 왜 필요한지 살펴보도록 하겠습니다.
+
+아래 왼쪽 그림과 같이 관측된 데이터들이 있다고 가정합니다. 이 데이터들을 최소자승법을 이용하여 포물선으로 근사(Fitting)시키면 오른쪽 그림과 같은 결과가 나옵니다.
+
+참고로, 최소자승법(Least Squares Method; LSM)이란 모델(여기서는 포물선)과의 $$ \sum{\mathrm{residual}^2} $$을 최소화하도록 모델 파라미터를 정하는 방법을 의미합니다.
+
+<br/><br/>
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/01.png">
+<br/><br/>
+
+그런데, 실제 관측 데이터가 위와 같이 깨끗하게 나오는 경우는 현실 세계에서는 별로 없습니다. 측정오차나 노이즈(noise) 등으로 인해 아래 왼쪽 그림 같은 경우가 일반적일 것입니다. 이때도 최소자승법을 적용하면 아래 그림과 같이 훌륭한 결과를 얻을 수 있습니다.
+
+<br/><br/>
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/02.png">
+<br/><br/>
+
+그런데, 만일 아래 왼쪽 그림과 같이 약간의 노이즈 정도가 아니라 데이터 자체가 완전히 틀어져 버린 경우는 어떻게 될까요? 이렇게 정상적인 분포에서 벗어난, 이상한 데이터들을 이상점(Outlier)라고 부르는데, 데이터에 Outlier(아웃라이어)가 끼어 있으면 최소자승법은 오른쪽 그림처럼 엉망이 되어 버립니다.
+
+<br/><br/>
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/03.png">
+<br/><br/>
+
+그런데, 이것을 RANSAC을 이용해 근사시키면 아래 그림과 같이 깨끗한 결과를 얻을 수 있습니다.
+
+<br/><br/>
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/04.png">
+<br/><br/>
+
+------
+## 2. RANSAC의 이해
+RANSAC이 왜 필요한지, 그리고 어디에 쓰는 놈인지는 대략 감을 잡았을 것으로 생각합니다. 그러면 이제 RANSAC이 무엇인지 좀더 구체적으로 살펴보도록 하겠습니다.
+
+일단, RANSAC은 영어로 RANdom SAmple Consensus의 대문자들을 딴 약자입니다. 글자 그대로 해석해 보면 무작위로 샘플 데이터들을 뽑은 다음에 최대로 컨센서스가 형성된 것을 선택한다는 의미입니다.
+
+최소자승법(Least Square Method)은 데이터들과의 $$ \sum{\mathrm{residual}^2} $$을 최소화하도록 모델을 찾지만, RANSAC은 컨센서스가 최대인, 즉 가장 많은 수의 데이터들로부터 지지를 받는 모델을 선택하는 방법입니다.
+
+위 포물선 예제에서 최소자승법이 선택한 모델과 RANSAC이 선택한 모델을 비교해 보면 어떤 경우가 좀더 많은 데이터틀로부터 지지를 받는지, 즉 근사된 모델(포물선) 근방에 있는 데이터들이 어느 쪽이 많은지 확인해 보면 됩니다.
+
+결국, RANSAC과 최소자승법의 차이는 무엇을 기준으로 모델의 파라미터를 찾는가의 차이입니다. 이 시점에서 한 가지 짚고 넘어가도록 하겠습니다. 그것은, RANSAC의 기준을 사용하면 관측 데이터에 Outliers가 많더라도 데이터 근사가 가능하다는 점입니다.
+
+------
+## 3. Inliers와 Outliers
+RANSAC 알고리즘을 설명하기 전에, 먼저 Inlier와 Outlier 개념을 정확히 잡고 넘어갔으면 합니다. RANSAC과 관련된 여러 미묘한 문제들은 결국 Inlier와 Outlier의 구분 문제이기 때문입니다.
+
+[Wikipedia](https://en.wikipedia.org/wiki/Random_sample_consensus)에 보면 Outlier(이상점)는 데이터의 분포에서 현저하게 벗어나 있는 관측값으로 정의되어 있습니다. 현실 세계에서 관측된 데이터들이 완벽한 경우는 거의 없으며 약간씩의 오차, 편차, 노이즈 등이 있는 경우가 대부분입니다. 그렇다면, 오차(에러)가 크면 Outlier, 그렇지 않으면 Inlier, 이렇게 구분하는 것일까요? 대답은 No!라고 생각합니다. 단지 편의상, 또는 별다른 방법이 없기 때문에 그렇게 할 뿐입니다.
+
+예를 들어, 일개미들의 특성을 파악하고 싶어서 실험을 했는데 거기에 병정개미의 데이터가 끼어들었다고 해봅시다. 그렇다면 일개미의 데이터는 Inlier이고 병정개미의 데이터는 Outlier입니다. 그런데 일개미의 데이터라 할지라도 조금씩 차이가 있기 때문에 어떤 놈은 편차가 클 것이고 어떤 놈은 편차가 작을 것입니다. 그렇더라도 이들은 모두 Inlier들이다. 한편, 병정개미 데이터의 경우 어떤 놈은 일개미들과 매우 유사한 값을 가질 수 있습니다. 하지만 아무리 유사하더라고 그것은 여전히 Outlier입니다.
+
+------
+## 4. RANSAC 알고리즘
+RANSAC 알고리즘은 위에서 설명한 컨센서스가 최대인 모델을 뽑기 위한 절차적 방법을 의미합니다.
+
+그 방법은 일단 무작위로 샘플 데이터 몇 개를 뽑아서 이 샘플 데이터들을 만족하는 모델 파라미터를 구합니다. 이렇게 구한 모델과 가까이에 있는 데이터들의 개수를 세어서 그 개수가 크다면 이 모델을 기억해 둡니다. 이러한 과정을 N번 반복한 후 가장 지지하는 데이터의 개수가 많았던 모델을 최종 결과로 반환합니다.
+
+이제 위에서 예로 든 포물선 근사 문제를 RANSAC으로 풀어보도록 합니다.
+
+관측된 데이터 값들은 $$(x_{1},y_{1}), ..., (x_{n},y_{n})$$, 포물선의 방정식은 $$f(x)=ax^2+bx+c$$라고 하면, 포물선을 결정하기 위해 결정해야 할 샘플의 개수는 최소 3개입니다. 왜냐하면, 포물선의 방정식을 결정하는 파라미터의 수가 3개이기 때문입니다.
+
+알고리즘은 다음과 같습니다:
+
+```
+1. c_max = 0 으로 초기화한다.
+2. 무작위로 세 점 (p1,p2,p3)를 뽑는다.
+3. 세 점을 지나는 포물선 f(x)를 구한다.
+4. 이렇게 구한 f(x)와의 거리 ri = |yi − f(xi)|가 T 이하인 데이터의 개수 c를 구한다.
+5. 만일 c가 c_max보다 크다면 현재 f(x)를 저장한다 (과거에 저장된 값은 버린다).
+6. 2~5 과정을 N번 반복한 후 최종 저장되어 있는 f(x)를 반환한다.
+7. (Optional) 최종 f(x)를 지지하는 데이터들에 대해 최소자승법을 적용하여 결과를 refine한다.
+```
+
+실제 문제에 따라서, 수식 등은 조금씩 바뀔 수 있지만 기본적인 RANSAC 알고리즘의 구조는 위와 동일합니다. 참고로, 위 포물선 예제에 대한 RANSAC Python 코드는 다음과 같습니다:
+
+{% highlight python %}
+import numpy as np
+import matplotlib.pyplot as plt
+
+# input data
+noise_sigma = 100
+x = np.arange(1, 101)
+y = -2 * np.power((x- 40), 2) + 30
+oy = 500 * abs(x - 60) - 5000
+y[49:70] = y[49:70] + oy[49:70]
+y = y + noise_sigma * np.random.rand(len(x))
+
+# build matrix
+A = np.zeros(shape=[len(x),3], dtype=float)
+A[:,2] = 1.0
+A[:,1] = x
+A[:,0] = np.power(x,2)
+B = y
+
+# RANSAC fitting
+n_data = len(x)
+N = 100 # iterations
+T = 3 * noise_sigma   # residual threshold
+n_sample = 3
+max_cnt = 0
+best_model = np.zeros(shape=[3,1], dtype=float)
+
+for itr in range(N):
+    # random sampling
+    k = np.floor(n_data * np.random.rand(n_sample))
+    k = k.astype(np.int64)
+
+    # model estimation
+    AA = np.zeros(shape=[len(k), len(k)], dtype=float)
+    AA[:,2] = 1.0
+    AA[:,1] = x[k]
+    AA[:,0] = np.power(x[k], 2)
+    BB = y[k]
+    BB = np.array(y[k])
+    X = np.matmul(np.linalg.pinv(AA), BB)
+
+    # evaluation
+    residual = np.abs(B - np.matmul(A, X))
+    cnt = np.where(residual < T)[0].shape[0]
+
+    if(cnt > max_cnt):
+        best_model = X
+        max_cnt = cnt
+
+# best model plotting
+y_fit = best_model[0] * np.power(x, 2) + best_model[1] * x + best_model[2]
+
+# fiter the inliers
+residual = np.abs(np.matmul(A, best_model) - B)
+in_k = np.where(residual < T)[0]
+A2 = np.zeros(shape=[len(in_k), 3], dtype=float)
+A2[:,2] = 1.0
+A2[:,1] = x[in_k]
+A2[:,0] = np.power(x[in_k], 2)
+B2 = y[in_k]
+X = np.matmul(np.linalg.pinv(A2), B2) # refined model
+F = np.matmul(A, X)
+
+# plot
+fig, ax = plt.subplots()
+ax.scatter(x, y_fit, color="red")
+ax.plot(x, y, color="blue")
+ax.plot(x, F, color="green")
+
+ax.set(xlabel='x', ylabel='y', title='RANSAC Fitted Model')
+ax.grid()
+
+plt.show()
+{% endhighlight %}
+
+위의 코드를 실행하면 다음과 같은 그래프가 출력됩니다.
+
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/05.png">
+<br/><br/>
+
+------
+## 5. RANSAC 활용 예
+A. Local Feature Matching을 이용하여 영상에서 특정 물체를 찾을 때
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/06.jpg">
+<br/><br/>
+
+B.Visual Odometry (인접한 영상프레임에서 카메라 모션을 추정할 때)
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/07.jpg">
+<br/><br/>
+
+C. 위치인식을 위해 Scene Matching을 수행할 때
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/08.jpg">
+<br/><br/>
+
+D. 물체 추적을 위해 인접한 영상프레임에서 이동체의 모션을 추정할 때
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/09.jpg">
+<br/><br/>
+
+------
+## 6. RANSAC 알고리즘의 파라미터
+RANSAC 알고리즘을 돌리기 위해서는 크게 2가지의 파라미터를 결정해야 합니다. 샘플링 과정을 몇 번 ($$N$$) 반복할 것인지, 그리고 Inlier와 Outlier의 경계를 ($$T$$) 어떻게 정할 것인지입니다.
+
+RANSAC이 성공하기 위해서는 N번의 시도 중 적어도 한번은 inlier들에서만 샘플 데이터가 뽑혀야 합니다. 이러한 확률은 N을 키우면 키울수록 증가할 것이지만 무한정 RANSAC을 돌릴 수는 없기 때문에 보통은 확률적으로 반복 횟수를 결정합니다.
+
+RANSAC 반복회수를 $$N$$, 한번에 뽑는 샘플 개수를 $$m$$, 입력 데이터들 중에서 Inlier의 비율을 $$a$$라 하면 $$N$$번 중 적어도 한번은 Inlier에서만 샘플이 뽑힐 확률 $$p$$는 다음과 같습니다:
+
+$$p=1−(1 − \alpha^m)^n$$  ...(1)
+
+예를 들어, 위 포물선 근사 예에서 Inlier 비율이 80%라고 했을 때, RANSAC 성공확률을 99.9%로 맞추려면 필요한 반복횟수는 다음과 같이 계산됩니다:
+
+$$ N = \displaystyle{\frac{\mathrm{log}(1−p)}{\mathrm{log}(1 − \alpha^m)}} = \displaystyle{\frac{\mathrm{log}(1 − 0.999)}{1 − 0.8^3}} = 9.6283 $$ ...(2)
+
+수학적 확률이긴 하지만 RANSAC을 10번만 돌려도 99.9% 확률로 해를 찾을 수 있다는 얘기입니다. 생각보다 숫자가 작아서 $$p$$를 99.99%로 놓고 계산해 봐도 $$N = 12.8378$$이 나옵니다.
+
+이 시점에서 RANSAC의 첫 번째 파라미터 $$N$$과 관련된 몇 가지 생각할 질문을 던져 봅니다.
+
+실제로 위 Python 예제 코드를 돌려보면 $$N = 100$$으로 놓고 돌려도 가끔 엉뚱한 해를 찾습니다. 수학적 확률은 거의 100%일텐데 왜일까요?
+
+포물선을 결정하기 위해서는 최소 3개의 점이 필요합니다. 하지만 굳이 샘플의 개수를 $$m = 3$$으로 맞출 필요가 있을까요? 예를 들어, 매 반복에서 샘플을 4개씩 뽑아서 최소자승법으로 포물선을 구할 수도 있을 것입니다. 그렇다면 한번에 샘플의 개수를 많이 뽑는게 좋을까요 아니면 최소한으로 뽑는게 좋은 것일까요? 또한 샘플의 개수에 따라 필요한 반복횟수 $$N$$은 어떻게 되는 것일까요?
+
+RANSAC 반복횟수를 확률적으로 결정하기 위해서는 Inlier 비율을 알고 있어야 합니다. 그런데, Inlier 비율을 모르고 있거나 혹은 입력 데이터마다 Inlier 비율이 변할 수 있다면 어떻게 해야 할까요?
+
+RANSAC의 반복회수 N에 대한 내용은 이정도로 하고, 두번째 파라미터인 T에 대해 살펴보도록 합니다. 사실 $$N$$보다는 $$T$$가 RANSAC에서 훨씬 중요하고 어려운 파라미터입니다.
+
+RANSAC은 지지하는 데이터 개수가 가장 많은 모델을 뽑는 파라미터 추정 방법입니다. 지지하는 데이터는 추정된 모델과 가까이 있는 데이터들을 의미합니다. 그렇다면 얼마나 가까워야 그 모델을 따르는 데이터라고 간주하는 것일까요?
+
+RANSAC 알고리즘에서는 데이터 $$(x_{i},y_{i})$$와 모델 $$f$$와의 거리 $$ r_{i} = \|y_{i} − f(x_{i})\| $$가 $$T$$ 이하이면 그 모델을 지지하는 데이터로 간주합니다. 그런데 이 파라미터 $$T$$를 우리가 결정해줘야 한다는게 문제입니다. 만일 $$$$를 너무 크게하면 모델간의 변별력이 없어지고 $$T$$를 너무 작게하면 RANSAC 알고리즘이 불안정해집니다.
+
+$$T$$를 선택하는 가장 좋은(일반적인) 방법은  Inlier들의 Residual 분산을 $$\sigma^2$$이라 할때, $$T=2\sigma$$ 또는 $$T=3\sigma$$ 정도로 잡는 것입니다. 즉, 먼저 RANSAC을 적용하고자 하는 실제 문제에 대해서 Inlier들로만 구성된 실험 데이터들을 획득하고, Inlier 데이터들에 대해서 최소자승법을 적용하여 가장 잘 근사되는 모델을 구합니다. 이렇게 구한 모델과 Inlier들과의 Residual $$ r_{i} = y_{i} - f(x_{i}) $$들을 구한 후, 이들의 분산(또는 표준편차)을 구해서, 이에 비례하게 T를 결정합니다. Inlier들의 Residual이 정규분포를 따른다고 가정했을 때, $$T = 2\sigma$$로 잡으면 97.7%, $$T=3\sigma$$로 잡으면 99.9%의 Inlier들을 포함하게 됩니다.
+
+$$T$$를 정하는데 있어서 정말 어려운 문제는 Inlier들의 분산이 동적으로 변하는 경우입니다. 이러한 경우에는 $$T$$를 데이터마다 유동적으로 결정해주어야 하는데 RANSAC에서는 이러한 문제를 Adaptive Threshold 또는 Adaptive Scale 문제라고 부르며, RANSAC에서 주요 연구 이슈중의 하나입니다. 참고로, RANSAC에서 Adaptive란 용어를 사용하는 경우는 2가지인데, 하나는 $$N$$을 Adaptive하게 하는 것이고 다른 하나는 $$T$$를 Adaptive하게 하는 것입니다.
+
+7. RANSAC과 Robust 파라미터 추정
+사실 RANSAC은 Robust Parameter Estimation 방법들 중 하나입니다. 어떤 방법 또는 알고리즘이 데이터 중에 Outlier가 있어도 처리가 가능하면 이를 Robust하다 라고 합니다.
+
+Robust한 파라미터 추정(Estimation) 방법으로는 RANSAC 외에도, [M-estimator](https://en.wikipedia.org/wiki/M-estimator), [LMedS](https://en.wikipedia.org/wiki/M-estimator) 등이 있습니다. 이러한 Robust 파라미터 추정 방법들은 Loss 함수에 따라 구분지을 수 있는데, 일단 아래 그림을 살펴보도록 합니다.
+
+<img src="{{ site.baseurl }}/assets/posts/2018-03-26-RANSAC/10.jpg">
+<br/><br/>
+
+우리가 흔히 알고 있는 최소자승법 (Least Square Method)는 그림의 보라색 점선과 같이 Loss 함수가 $$p(r) = r^2$$으로 정의되는 함수입니다 (단, $$r_{i} = y_{i} − f(x_{i})$$는 데이터 $$(x_{i},y_{i})$$의 Residual). 반면, RANSAC은 Loss 함수가 위 그림의 초록색 선처럼 Residual이 T보다 작으면 0, T보다 크면 1로 정의됩니다. 즉, RANSAC에서는 Residual이 T보다 작으면 에러가 없는 것으로 간주하고, $$T$$보다 큰 경우에는 그 크기에 관계없이 모두 1로 간주하는 것입니다.
+
+RANSAC을 좀더 개선한 방법으로 MLESAC(Maximum Likelihood SAC)이라는 것이 있습니다. RANSAC은 $$T$$ 이내에만 들어오면 에러가 없는 것으로 간주하기 때문에 Gaussian이나 정규분포처럼 $$T$$ 내에서도 모델에 가까울수록 데이터들이 좀더 밀집되는 형태는 잘 반영하지 못합니다. 하지만, MLESAC에서는 위 붉은색 선처럼 데이터가 모델에 가까울수록 에러를 적게 줌으로써, 데이터들이 가장 밀집된 곳을 찾을 수 있도록 해 줍니다.
+
+LMedS(Least Median of Squares)는 RANSAC 계열과는 조금 다른 방법으로 Robust하게 모델을 추정하는 방법입니다. LMedS에서는 Residual들의 Median (Residual들을 순서대로 정렬했을 때 순서상 가운데에 있는 값)이 최소화되는 모델을 찾습니다. 단, LMedS는 Outlier 비율이 50% 이하일 경우에만 적용할 수 있는 방법입니다.
+
+------
+## 8. RANSAC에 대한 생각
+RANSAC은 데이터에 포함된 outlier 비율에 관계없이 적용할 수 있는 매우 강력하면서도 효과적인 파라미터 추정 방법이지만 Random성으로 인한 몇몇 문제점을 가집니다.
+
+동일한 입력 데이터에 대해서도 RANSAC 결과가 매번 달라질 수 있습니다.
+
+아무리 N을 늘려도 해를 못찾을 수 있다. 수학적 확률은 수학적 확률일 뿐입니다.
+
+Outlier들이 Random하게 분포되어 있지 않고 Structure를 갖는다면 Outlier들의 분포를 근사해 버릴 수도 있습니다.
+
+몇개 샘플만으로 모델을 구하는 방식은 문제에 따라 위험할 수도 있습니다. 위 포물선 예에서 점 3개를 뽑으면 포물선이 결정됩니다. 하지만 3 점이 모두 Inlier라 할지라도 점 자체에 약간씩의 오차가 포함되어 있기 때문에 결과적으로 여기서 계산된 포물선도 오차를 갖게 됩니다. 그런데, 이 점들이 서로 인접해 있다면 이 오차가 매우 커질수 있습니다. 포물선의 한쪽 면에서 뽑힌 인접한 점 3개만 보고 포물선이 어디에서 꺾일지 알 수 있는지 생각해 보아야 합니다.
+
+RANSAC을 사용하면서 RANSAC의 장점 뿐만 아니라 이와 같은 한계도 같이 고려하면서 사용한다면 RANSAC을 좀더 잘 사용할 수 있을 것입니다.

@@ -15,8 +15,8 @@ Green Tool에서 찾은(Found) Tag의 수와 Display Filter를 통해 걸러낸 
 아래 이미지와 같이 Table 상에서 Tag '7'은 Found가 30개이며, 이를 더블클릭하면 Display Filter에 자동으로 `best_tag = '7'` 입력됨과 동시에 이에 해당하는 Views의 개수를 알 수 있는데 34개의 Views를 표시하고 있는 것을 확인할 수 있습니다 (이와 같은 상황은 Feature Size를 상식 이하로 크게 잡고 Epochs 수를 매우 낮추어 제대로 분류하지 못하도록 하면 쉽게 만들 수 있습니다. 간혹 Feature Size를 너무 크게 잡으면 수치불안정으로 진행이 안 될 수 있으니 이보다는 크게 잡아야 합니다).
 
 즉, 이미 아시는 분은 아시겠지만, `Found for Tag '7' ≠ best_tag = '7'`입니다.
-<br/><br/>
 
+<br/><br/>
 <img src="{{ site.baseurl }}/assets/posts/2018-07-22-MultiClassClassification/01.png">
 <br/><br/>
 

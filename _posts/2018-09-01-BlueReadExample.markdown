@@ -3,7 +3,7 @@ layout: post
 title:  "ViDi API / Blue Read Example"
 date:   2018-09-01 23:19:00
 author: Alex Choi
-categories: deep-learning ViDi
+categories: Deep-Learning ViDi
 ---
 
 Today I'd like to share an ViDi API example of Blue Read tool with my experiencing from SDI battery OCR evaluation project.

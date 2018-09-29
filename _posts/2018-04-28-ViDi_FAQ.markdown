@@ -1,0 +1,164 @@
+---
+layout: post
+title:  "ViDi / ViDi Suite FAQ"
+date:   2018-04-28 13:25:00
+author: Alex Choi
+categories: Deep-Learning
+---
+
+------
+## Technical and Integration aspects  
+
+#### How does Cognex ViDi Suite work and what methods are used
+Cognex ViDi Suite is a specialized implementation of a neural network that has been optimized for machine vision under real-world factory automation conditions. The specifics of this optimization are confidential, as they are what makes Cognex ViDi Suite unique.
+
+#### Is Cognex ViDi Suite subjective or objective?
+ViDi’s training algorithm intentionally introduces a small amount of randomness. In consequence, we typically measure a <font color="red">1-2% variation in behavior even when training from the same data set</font>. Please refer to the technical documentation for a more detailed explanation (“By how much does the results accuracy vary from one training to another?”)
+
+#### How fast is Cognex ViDi Suite?
+<font color="red">Typical training time is 2-5 minutes on a PC with a reasonably high-end NVidia GPU</font>. We provide a link to an up-to-date table of available GPUs that includes relative performance capabilities for your [reference](http://www.videocardbenchmark.net/high_end_gpus.html). The runtime speed of the application depends on three main factors:
+
+- Image size: larger images take longer to process
+- Defect size: looking for small defects takes longer than for large defects
+- GPU: the more GPUs (up to 4) and the newer/more powerful the GPU, the faster the application will run
+
+As a coarse guide, <font color="red">runtime will take between 2ms (for single character ID) up to 2 seconds</font> (for **a huge, finely-detailed inspection scene**). A rule-of-thumb is computation can be done at **10-15 Megapixels/second/GPU, or 40-60 Megapixels/sec for a high end 4-GPU card**. Of course, you will need to test your actual application for a precise figure.
+
+#### What is the feedback data you get from the ViDi tools?
+Each tool provides XML data with the following results. Please consult the product documentation for API details.
+
+- **ViDi Blue**: Image coordinates (X,Y), feature orientations (θ), scale, score, geometric models, angles between 2 linked features.
+- **ViDi Red Unsupervised**: Maximum score, score of each pixel, center of gravity of the defective area, enclosing polygon, hit map, anomaly area
+- **ViDi Red Supervised**: Maximum score, score of each pixel, center of gravity of the defective area, polygon, hit map, anomaly area
+- **ViDi Green**: Confidence index, 1st best type of class found, 2nd best class found, etc.
+
+#### Is the image source of importance, or can I also use thermal or range images with Cognex ViDi Suite?
+Cognex ViDi Suite supports **PNG, BMP, TIFF, and JPEG** images, **8 or 16 bit, 1-4 channels**. As long as your data fits in this format, the tools can process your images. That does not imply any specific performance; for instance, some data sources may be noisier than others, or be subject to bias that influences the ViDi algorithms. But as a general rule, you can use images sources like _thermal, X-Ray and 3D range images_ with ViDi Suite.
+
+#### What is the largest image that ViDi can process meaningfully?
+There is <U>no practical limit</U> for training/runtime as the systems can easily handle images over 1GB. However, the <U>GUI is only optimized for up to <strong>10 MP</strong> images</U>. Larger images may causes glitches in the user interaction experience, even though the training will run correctly.
+
+#### Is there any kind of HMI provided with Cognex ViDi Suite or is it a pure library?
+The Cognex ViDi Suite training interface is a standalone interactive executable with its own UI that produces a “workspace” (trained model or recipe).
+
+At runtime, users will program against a .NET API to run the Red, Green or Blue tool. They have three choices for displaying ViDi results
+
+- Use the ViDi API to create an image with overlay graphics
+- Use ViDi WPF components to draw graphics on a separate display
+- Use the ViDi result data to manually draw overlay graphics on a VisionPro display that also shows VisionPro results
+
+In the future, Cognex will provide methods to more seamlessly combine VisionPro and ViDi tool results on a common display.
+
+#### Is the GPU in a system exclusively for Cognex ViDi Suite or can it be used by other applications as well?
+The GPU is <U>not exclusively reserved</U> for Cognex ViDi Suite, but using it for other applications will impact ViDi performance.
+
+#### Can I use multiple GPUs?
+Absolutely. Cognex ViDi Suite supports <U>up to 4 NVidia GPUs</U>. The system will automatically detect and make use of these GPUs to accelerate the application. For details, please refer to the Technical Documentation FAQ under topics “How to build a 4-GPU Machine” and “By How Much will
+Processing Time Improve with Multiple GPUs?”
+
+#### How can ViDi communicate directly through FFP or discrete I/O directly?
+ViDi is a DLL with a .NET API to the Red, Green and Blue tools. It does not include built-in image acquisition or I/O capabilities. You will need to call these functions using your standard application framework. In order to simplify this, every new ViDi shipment will include a copy of VisionPro, which will provide image acquisition and database read/write, image display, I/O and factory communications functions.
+
+------
+## Learning/Training Capabilities
+
+#### What is the purpose of the Development of dongle?
+The Development dongle provides a means to train and qualify the system. It includes the Red, Green and Blue tools. As it is time-limited and not suitable for deployment, the price is lower than for permanent runtime Deployment dongles.
+
+#### How long does the Development dongle run?
+One year from shipment.
+
+#### What do you need to train a scratch?
+As Cognex ViDi Suite is taught by example, you should present it with tens of images that show the range of scratches that you need to detect. These should be real cases showing variation in shape, size, material, lighting, etc. – whatever conditions will be found in production.
+
+#### How do you organize Cognex ViDi Suite if you for instance inspect 20 different views?
+The answer depends on how consistent the images (and especially the defects) are. If the defects look very similar from view to view, a single training may be enough. <U>If there’s significant variation in scene and defect appearance (such as field of view, lighting, etc.), then multiple workspaces will need to be created</U>. There’s no simple answer we can give that applies across all applications.
+
+#### How do you retrain Cognex ViDi Suite if new defects show up?
+There should be no need to retrain a Red tool in Unsupervised mode. The Unsupervised Red tool is trained using only good images, and it reports any anomalies from these images.
+
+In Supervised mode, you will want to add images of the new defects to your training set. You will need to explicitly highlight them, so the system knows exactly what constitutes the new defect type. Be aware that adding images to the training set requires a complete retraining. It isn’t possible to simply add incremental data without a full retrain. In this case, Cognex recommends re-validating the system on a pre-defined set of test images.
+
+#### With traditional Vision I know exactly what is possible or not. How do I know how Cognex ViDi Suite behaves?
+It is true that ViDi does not behave like a traditional image processing tool with explicitly defined behavior. There is no guarantee that it will catch all defects of a specific size or grey level, for instance. But ViDi’s compensating advantage is that it is much more adaptable to real world conditions, and can more easily be deployed to solve problems that can’t be addressed well (or at all) with traditional machine vision approaches.
+
+So it is essential to start with a representative set of training images, to label the images and/or defects in them correctly, and to carefully tune the system until you achieve the expected behavior.
+
+#### How can you control the training images and find the best trained set?
+By default, the system trains using a 50% of the images provided, randomly selected. You can change this percentage, for instance including more images if there is a large variation in part appearance or the data set is small. You might decrease the percentage if the data set is very large and consistent. You can also explicitly include certain images if they contain key examples that are limited to just a few images.
+
+In addition, there are a few parameters such as feature size, sampling density, etc. that you can adjust based on your application requirements. The system also includes an internal optimization feature (the “Parameter Search Tool”) that will automatically tune key parameter settings, based on your images and classifications. This will help select an optimal combination of these parameters.
+
+#### How is the segmentation done in an OCR application?
+Segmentation is handled internally by the ViDi Blue tool, not as a separate pre-processing step prior to character recognition. You can think of the segmentation and recognition steps as a single process within the Blue tool. Much of what is normally done during segmentation is handled at training time by the Blue tool, where it learns the expected relationship between characters. With degraded print – such as with high speed ink jet applications – segmentation can be extremely challenging using traditional OCR techniques. This is actually one of the strengths of the Blue tool.
+
+------
+## Applications
+
+#### What are the limitations of the ViDi software?
+ViDi Suite is not suitable for those types of application:
+
+- **Precision Measurements** and metrology
+- **Print Quality Grading**. ViDi is not a font-based system where the user specifies the expected character at each position. Instead, it trains on the overall pattern, and can sometimes be confused if a misprinted character resembles a valid character.
+- <U><strong>Applications where runtime images differ significantly</strong> from train time images in lighting, contrast, FoV, etc. but are still considered acceptable</U>
+- It cannot be trained from CAD data
+
+#### Can you explain what kind of applications you solve with ViDi?
+Cognex ViDi Suite is especially well-suited for three types of applications:
+
+- **Cosmetic inspection** applications such as scratches, stains, chips and missing/extra ink, where explicit rule-based solutions are brittle or overly complex
+- **Feature location** on deformed or inconsistent parts where PatMax is not a good candidate. Note that the resulting position information is not as accurate as PatMax, but it may be able to find objects whose appearance is less consistent than PatMax expects.
+- **Optical character recognition on deformed text**, such as high speed ink jet, molded rubber or stamped metal
+- **Defect classification**
+- **Product sorting**
+
+#### Where is the borderline between Cognex ViDi Suite and traditional vision?
+Some applications are clearly better suited to classic machine vision, such as precision alignment, metrology, and 2D code reading. Others are better for Cognex ViDi Suite, such as cosmetic inspection or OCR on deformed characters. Border areas include many feature location and OCR applications, or simple / consistent inspection applications.
+
+In these cases, our recommendation is to try both approaches to see which works best. Other considerations include the cost of GPU-accelerated hardware and the ease/complexity of training.
+
+But achieving an accurate and stable vision result should be the overriding concern.
+
+#### What is necessary to perform a proof of concept/feasibility?
+AE Engineers have to collect image data sets of good and bad parts under the expected lighting and optics conditions, and understand your customer’s defect criteria.
+
+- For <font color="red">Object Detection</font>, we recommend **30-50** samples images representing the range of expected cases.
+- For <font color="red">OCR</font>, **30-50** samples of each character, shown in the range of possible string positions.
+- For <font color="red">Unsupervised Inspection</font>, **30-50** images of good parts and 30-50 of bad parts.
+- For <font color="red">Supervised Inspection</font>, include **30-50** images of each defect type or feature to segment.
+
+Be aware that the number of images needed is closely related to the accuracy the customer is looking for. <U>If he needs 99.9% accuracy, you may need 1,000 images</U>, while <U>99% accuracy may only need 100 images</U>.
+
+#### How many pixels does a "defect" need to have to be detectable in ViDi?
+The ViDi software is **capable of detecting defects as small as a single pixel**. However, “defects” this small may be no more than camera noise or lighting artifacts. You should set your <U>minimum defect size based on the quality of the images</U> you provide and the actual reliable size of any defect you want to detect.
+
+------
+## Roadmap & Product Development
+
+#### Do you plan to combine ViDi and VisionPro in a single package?
+Yes, Cognex will include a VisionPro license with every ViDi Suite purchase. In future releases, the two will be integrated in a single software package.
+
+#### How will ViDi be integrated with VisionPro and Designer?
+As a first step, Cognex will simplify data conversion between VisionPro and ViDi tools, without requiring customers to do this manually. We are also looking into other ideas to more tightly couple the products, and will announce details later this year.
+
+What are you doing to support OPC UA and cloud connectivity?
+
+Cognex is exploring several Cloud Server options. We’re extremely interested in talking with partners who have an interest in this capability, in order to better understand their deployment model and requirements. Please contact Product Marketing to discuss this further.
+
+#### Will you proivide a pre-trained font for OCR?
+Cognex would consider providing a pre-trained Deep Learning OCR tool if there is sufficient demand. It will help our decision if you can share your application opportunities with your Sales Engineer and our Product Marketing team.
+
+#### Will you change the name of ViDi?
+As a general approach, we intend to leverage “Cognex Deep Learning” as the common name for these technologies. While you can use the term “ViDi,” we would recommend against building it into any advertising material, as we are planning to phase it out as a brand name.
+
+------
+## Partners
+
+#### Can PSI have a web based presentation with more technical detail to prequalify if ViDi is of any interest to us as it might be a significant investment in our time?
+Cognex will publish various industry documents and white papers describing ViDi’s applicability to key markets. But the two best ways to learn are to share your application requirements with a Cognex Application Engineer, or to attend the two-day ViDi training class.
+
+#### Should the PSI teach the end customers to learn how to use and train ViDi?
+We assume PSIs will create the initial application solution, both the narrow ViDi trained workspace as well as the overall system with image acquisition, results analysis, I/O, etc. We anticipate that most customers will have the capability to update their training data to reflect new part conditions, if you choose to train them and provide an interface to do so. This is as much a business question as a technical one, and as such something only PSI can answer.
+
+#### Can partners have AE resources to evaluate applications with ViDi?
+Cognex AEs will be available to help with initial evaluations. However, we can’t promise availability for every project, so please work closely with your Cognex Sales Engineer to schedule any requests. In order to be successful, please do the up-front work to collect image data sets of good and bad parts under the expected lighting and optics conditions (refer to “What is necessary to perform a proof of concept/feasibility?”) and understand your customer’s defect criteria.
